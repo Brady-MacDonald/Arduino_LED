@@ -1,6 +1,9 @@
 #ifndef LED_HEADER
 #define LED_HEADER
 
+#include <FastLED.h>
+#include <Keypad.h>
+
 //Arduino set up
 #define NUM_LEDS 149
 #define LED_PIN 2

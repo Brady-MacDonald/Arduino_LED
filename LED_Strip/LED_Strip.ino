@@ -1,6 +1,4 @@
-#include <LED_strip.h>
-#include <FastLED.h>
-#include <Keypad.h>
+#include "LED_Strip.h"
 
 void setup() {
   Serial.begin(9600);
@@ -32,6 +30,11 @@ void setup() {
   Color.r = 0;
   Color.g = 1;
   Color.b = 0;
+
+  attachInterrupt(digitalPinToInterrupt(9), ReadInput,CHANGE);  //interrupt setup keypad row 1
+  attachInterrupt(digitalPinToInterrupt(10),ReadInput,CHANGE);  //interrupt setup keypad row 2
+  attachInterrupt(digitalPinToInterrupt(11),ReadInput,CHANGE);  //interrupt setup keypad row 3
+  attachInterrupt(digitalPinToInterrupt(12),ReadInput,CHANGE);  //interrupt setup keypad row 4
 }
 
 void loop() {
@@ -47,7 +50,6 @@ void loop() {
     ledType = padInput;
     Serial.println(padInput);
   }
-  
   switch (ledType) {
     case '1':
       visualize_music();
@@ -67,12 +69,13 @@ void loop() {
       SetPalette(startIndex, ForestColors_p);
       break;
     case '7':
-        RGBLoop();
+      RGBLoop();
+      break;
     case '8':
-        PingPong(0, 0xff, 0, 10, 10, 50);
+      PingPong(0, 0xff, 0, 10, 5, 10);
       break;
     case '9':
-        DoublePong(0, 0xff, 0, 10, 10, 50);
+      DoublePong(0, 0xff, 0, 10, 5, 10);
       break;
     case '0':
       UserColour();
@@ -84,6 +87,7 @@ void loop() {
       SetAll(125, 0, 25);
       break;
     default:
+      SetAll(100, 100, 100);
       break;
   }
   delay(DELAY);
@@ -91,6 +95,18 @@ void loop() {
 
 void showStrip(){
   FastLED.show();
+}
+
+void ReadInput(){
+  Serial.println("IN");
+  char padInput = keypad.getKey();
+
+  //check for new input
+  //needed as there null is read if no input 
+  if(padInput){
+    ledType = padInput;
+    Serial.println(padInput);
+  }
 }
 
 void SetPalette(uint8_t colorIndex, CRGBPalette16 palette)
@@ -104,52 +120,66 @@ void SetPalette(uint8_t colorIndex, CRGBPalette16 palette)
 }
 
 void UserColour(){
-  byte red=0, green=0, blue=0;
-  int index = 0;
-  int count = 0;
+  char red[4]={'0','0','0','\0'}, green[4]={'0','0','0', '\0'}, blue[4]={'0','0','0','\0'};
+  int redVal, greenVal, blueVal;
+  int index = 0, count = 0;
   char padInput;
-  char userInput[3];
-  
+   
   while(index != 3){
     padInput = keypad.getKey();
 
     if(padInput){
       if(padInput == '*'){
         index++;
+        count=0;
       }
       else{
         Serial.print("index: ");
-        Serial.println(index);
-
-        Serial.print("padInput: ");
+        Serial.print(index);
+        Serial.print(" padInput: ");
         Serial.println(padInput);
 
         if(index == 0){
-          red = padInput;
+          green[count]=padInput;
+          count++;
+          Serial.print("count: ");
+          Serial.println(count);
+          Serial.print("green: ");
+          Serial.println(green);
+        }
+        else if (index == 1){
+          red[count]=padInput;
+          count++;
           Serial.print("red: ");
           Serial.println(red);
         }
-        else if (index == 1){
-          blue = padInput;
+        else if(index == 2){
+          blue[count]=padInput;
+          count++;
           Serial.print("blue: ");
           Serial.println(blue);
-        }
-        else if(index == 2){
-          green = padInput;
-          Serial.print("green: ");
-          Serial.println(green);
         }  
       }      
     } 
   } 
+  redVal = atoi(red);
+  blueVal = atoi(blue);
+  greenVal = atoi(green);
+  
   Serial.println("FINAL: ");
-  Serial.print ln(red);
-  Serial.println(green);
-  Serial.println(blue);
-  SetAll(green, red, blue);
-  delay(5000);
+  Serial.println(redVal);
+  Serial.println(greenVal);
+  Serial.println(blueVal);
+
+  SetAll(redVal, greenVal, blueVal);
 }
 
+void SetThem(int red, int green, int blue) {
+  for(int i = 0; i < NUM_LEDS; i++ ) {
+    leds[i] = CRGB(red, green, blue);
+  }
+   FastLED.show();
+}
 void PingPong(byte red, byte green, byte blue, int EyeSize, int SpeedDelay, int ReturnDelay){
   RightToLeft(red, green, blue, EyeSize, SpeedDelay, ReturnDelay);
   LeftToRight(red, green, blue, EyeSize, SpeedDelay, ReturnDelay);
