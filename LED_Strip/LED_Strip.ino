@@ -1,23 +1,22 @@
 #include "LED_Strip.h"
 
+int state = 0; 
+int r=252;
+int g=0;
+int b=0;
+
 void setup() {
   Serial.begin(9600);
 
   FastLED.addLeds<WS2812B, LED_PIN>(leds, NUM_LEDS);
-  
-  for (int i = 0; i < NUM_LEDS; i+=2){
-    int r = i;
-    int b = 256 - i;
-    int g = 0;
-    leds[i] = CRGB(r, g, b);       
-    FastLED.show();
-  }
-  for (int i = NUM_LEDS; i > 0; i-=2){
-    int r = 256 - i;
-    int b = i;
-    int g = 0;
-    leds[i] = CRGB(r, g, b);       
-    FastLED.show();
+
+  int colorVal=0;
+    for(int j = 0; j < NUM_LEDS; j++){
+      int r = j;
+      int b = 255 - j;
+      int g = 0;
+      leds[j] = CRGB(r, g, b);       
+      FastLED.show(); 
   }
     
   for (int i = 0; i < AVGLEN; i++) {
@@ -31,33 +30,54 @@ void setup() {
   Color.g = 1;
   Color.b = 0;
 
+  /*
+  pinMode(9, INPUT_PULLUP);
+  pinMode(10, INPUT_PULLUP);
+  pinMode(11, INPUT_PULLUP);
+  pinMode(12, INPUT_PULLUP);
+  pinMode(4, INPUT_PULLUP);
+  pinMode(5, INPUT_PULLUP);
+  pinMode(6, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(9), ReadInput,CHANGE);  //interrupt setup keypad row 1
   attachInterrupt(digitalPinToInterrupt(10),ReadInput,CHANGE);  //interrupt setup keypad row 2
   attachInterrupt(digitalPinToInterrupt(11),ReadInput,CHANGE);  //interrupt setup keypad row 3
   attachInterrupt(digitalPinToInterrupt(12),ReadInput,CHANGE);  //interrupt setup keypad row 4
+  attachInterrupt(digitalPinToInterrupt(4), ReadInput,CHANGE);  //interrupt setup keypad row 1
+  attachInterrupt(digitalPinToInterrupt(5),ReadInput,CHANGE);  //interrupt setup keypad row 2
+  attachInterrupt(digitalPinToInterrupt(6),ReadInput,CHANGE);  //interrupt setup keypad row 3*/
 }
 
 void loop() {
-
-  static uint8_t startIndex = 0;
-  startIndex = startIndex + 1;
-
   char padInput = keypad.getKey();
 
-  //check for new input
-  //needed as there null is read if no input 
-  if(padInput){
-    ledType = padInput;
-    Serial.println(padInput);
+  if(Serial.available() > 0){  
+    state = Serial.read();
+  } 
+
+  if(state){
+    ledType = state;
   }
+  else if(padInput){
+    ledType = padInput;
+  }
+  
+  LightController(ledType);
+  delay(DELAY);
+}
+
+void LightController(int setting){
+  static uint8_t startIndex = 0;
+  startIndex = startIndex + 1;
+  
   switch (ledType) {
     case '1':
       visualize_music();
       break;
     case '2':
-      //DisplaySolidColour();
+      MiddleOut();
       break;
     case '3': 
+      Proton();
       break;
     case '4':
       SetPalette(startIndex, LavaColors_p);
@@ -72,7 +92,7 @@ void loop() {
       RGBLoop();
       break;
     case '8':
-      PingPong(0, 0xff, 0, 10, 5, 10);
+      PingPong(0, 0xff, 0, 5, 10);
       break;
     case '9':
       DoublePong(0, 0xff, 0, 10, 5, 10);
@@ -87,10 +107,9 @@ void loop() {
       SetAll(125, 0, 25);
       break;
     default:
-      SetAll(100, 100, 100);
+      SetAll(0, 255, 0);
       break;
   }
-  delay(DELAY);
 }
 
 void showStrip(){
@@ -119,6 +138,13 @@ void SetPalette(uint8_t colorIndex, CRGBPalette16 palette)
   FastLED.show();
 }
 
+void SetAll(byte red, byte green, byte blue) {
+  for(int i = 0; i < NUM_LEDS; i++ ) {
+    leds[i] = CRGB(red, green, blue);
+  }
+   FastLED.show();
+}
+
 void UserColour(){
   char red[4]={'0','0','0','\0'}, green[4]={'0','0','0', '\0'}, blue[4]={'0','0','0','\0'};
   int redVal, greenVal, blueVal;
@@ -127,37 +153,23 @@ void UserColour(){
    
   while(index != 3){
     padInput = keypad.getKey();
-
     if(padInput){
       if(padInput == '*'){
         index++;
         count=0;
       }
       else{
-        Serial.print("index: ");
-        Serial.print(index);
-        Serial.print(" padInput: ");
-        Serial.println(padInput);
-
         if(index == 0){
           green[count]=padInput;
           count++;
-          Serial.print("count: ");
-          Serial.println(count);
-          Serial.print("green: ");
-          Serial.println(green);
         }
         else if (index == 1){
           red[count]=padInput;
           count++;
-          Serial.print("red: ");
-          Serial.println(red);
         }
         else if(index == 2){
           blue[count]=padInput;
           count++;
-          Serial.print("blue: ");
-          Serial.println(blue);
         }  
       }      
     } 
@@ -165,24 +177,28 @@ void UserColour(){
   redVal = atoi(red);
   blueVal = atoi(blue);
   greenVal = atoi(green);
-  
-  Serial.println("FINAL: ");
-  Serial.println(redVal);
-  Serial.println(greenVal);
-  Serial.println(blueVal);
 
   SetAll(redVal, greenVal, blueVal);
 }
 
-void SetThem(int red, int green, int blue) {
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    leds[i] = CRGB(red, green, blue);
-  }
-   FastLED.show();
+int ReadSoundDifference() {
+  int soundValue1 = analogRead(ANALOG_READ);
+  delay(1);
+  int soundValue2 = analogRead(ANALOG_READ);
+  int diff = soundValue1 - soundValue2;
+  return diff;
 }
-void PingPong(byte red, byte green, byte blue, int EyeSize, int SpeedDelay, int ReturnDelay){
-  RightToLeft(red, green, blue, EyeSize, SpeedDelay, ReturnDelay);
-  LeftToRight(red, green, blue, EyeSize, SpeedDelay, ReturnDelay);
+
+void PingPong(byte red, byte green, byte blue, int SpeedDelay, int ReturnDelay){
+  if(width >= 25){
+    reverse = 1;
+  }
+  if(width == 1 && reverse){
+    reverse = 0;
+  }
+    
+  RightToLeft(red, green, blue, SpeedDelay, ReturnDelay);
+  LeftToRight(red, green, blue, SpeedDelay, ReturnDelay);
 }
 
 void DoublePong(byte red, byte green, byte blue, int EyeSize, int SpeedDelay, int ReturnDelay){
@@ -190,25 +206,96 @@ void DoublePong(byte red, byte green, byte blue, int EyeSize, int SpeedDelay, in
   CenterToOutside(red, green, blue, EyeSize, SpeedDelay, ReturnDelay);
 }
 
+void MiddleOut(){
+  int s=ReadSoundDifference();
+  Serial.println(s);
+  if((s>=50))
+  {
+    leds[NUM_LEDS/2]=CRGB(20, 135, 217);
+    leds[NUM_LEDS/2+1]=CRGB(20, 135, 217);
+  }
+  else if((s<=-50))
+  {
+    leds[NUM_LEDS/2]=CRGB (20, 217, 30);
+    leds[NUM_LEDS/2+1]=CRGB (20, 217, 30);
+  }
+  else
+  {
+    leds[NUM_LEDS/2] = CRGB(0, 0, 0xff);
+    leds[NUM_LEDS/2+1] = CRGB(0, 0, 0xff);
+  }
+  for (int i = 0; i <= NUM_LEDS/2; i++) 
+  {
+    leds[i] = leds[i+1];
+    leds[NUM_LEDS-i] = leds[NUM_LEDS-1-i];
+  }
+ FastLED.show();
+ delay(10);
+}
+
+void Proton(){
+    for(int i = 0; i < 100; i++) {
+      SetAll(0,0,0xff);
+      leds[i] = CRGB(0, 0xff, 0);
+      showStrip();
+      delay(5);
+    }
+    for(int i = 100; i > 0; i--) {
+      SetAll(0,0,0xff);
+      leds[i] = CRGB(0, 0xff, 0);
+      showStrip();
+      delay(5);
+    }
+  delay(10);
+}
+
+void LeftToRight(byte red, byte green, byte blue, int SpeedDelay, int ReturnDelay) {
+  for(int i = 0; i < NUM_LEDS-width-2; i++) {
+    SetAll(0,0,0xff);
+    for(int j = 0; j < width; j++) {
+      leds[i+j] = CRGB(0, 0xff, 0);
+    }
+    showStrip();
+    delay(SpeedDelay);
+  }
+  delay(ReturnDelay);
+  if(reverse)
+    width--;
+  else
+    width++;
+}
+
+void RightToLeft(byte blue, byte red, byte green, int SpeedDelay, int ReturnDelay) {
+  for(int i = NUM_LEDS-width-2; i > 0; i--) {
+    SetAll(0,0, 0xff);
+    for(int j = 0; j < width; j++) {
+      leds[i+j] = CRGB(0, 0xff, 0);
+    }
+    showStrip();
+    delay(SpeedDelay);
+  }
+  delay(ReturnDelay);
+  if(reverse)
+    width--;
+  else
+    width++;
+}
+
 void CenterToOutside(byte red, byte green, byte blue, int EyeSize, int SpeedDelay, int ReturnDelay) {
-  int r = 0;
-  int g = 0;
-  int b = 125;
   for(int i =((NUM_LEDS-EyeSize)/2); i>=0; i--) {
-    SetAll(r, g, b);
-   
+    SetAll(0, 0, 0xff);
     leds[i] = CRGB(red/10, green/10, blue/10);
+    
     for(int j = 1; j <= EyeSize; j++) {
       leds[i+j] = CRGB(red, green, blue);
     }
     leds[i+EyeSize+1] = CRGB(red/10, green/10, blue/10);
-   
     leds[NUM_LEDS-i] = CRGB(red/10, green/10, blue/10);
+    
     for(int j = 1; j <= EyeSize; j++) {
       leds[NUM_LEDS-i-j] = CRGB(red, green, blue);
     }
     leds[NUM_LEDS-i-EyeSize-1] = CRGB(red/10, green/10, blue/10);
-   
     showStrip();
     delay(SpeedDelay);
   }
@@ -216,68 +303,20 @@ void CenterToOutside(byte red, byte green, byte blue, int EyeSize, int SpeedDela
 }
 
 void OutsideToCenter(byte red, byte green, byte blue, int EyeSize, int SpeedDelay, int ReturnDelay) {
-  int randy = random(50,200);
-  int r = 0;
-  int g = 25;
-  int b = 100;
-  
   for(int i = 0; i<=((NUM_LEDS-EyeSize)/2); i++) {
-    SetAll(r,g,b);
-   
+    SetAll(0,0,0xff);
     leds[i] = CRGB(red/10, green/10, blue/10);
+    
     for(int j = 1; j <= EyeSize; j++) {
       leds[i+j] = CRGB(red, green, blue);
     }
     leds[i+EyeSize+1] = CRGB(red/10, green/10, blue/10);
-   
     leds[NUM_LEDS-i] = CRGB(red/10, green/10, blue/10);
+    
     for(int j = 1; j <= EyeSize; j++) {
       leds[NUM_LEDS-i-j] = CRGB(red, green, blue);
     }
     leds[NUM_LEDS-i-EyeSize-1] = CRGB(red/10, green/10, blue/10);
-   
-    showStrip();
-    delay(SpeedDelay);
-  }
-  delay(ReturnDelay);
-}
-
-void LeftToRight(byte green, byte blue, byte red, int EyeSize, int SpeedDelay, int ReturnDelay) {
-  for(int i = 0; i < NUM_LEDS-EyeSize-2; i++) {
-    if(hue>255){
-      hue = 0;
-    }
-    hue++;
-    SetAll(0,0,0);
-    //leds[i] = CRGB(hue/10, hue/10, hue/10);
-    leds[i] = ColorFromPalette( currentPalette, i, 150, currentBlending);
-    for(int j = 1; j <= EyeSize; j++) {
-      //leds[i+j] = CRGB(hue, hue, hue);
-      leds[i+j] = ColorFromPalette( currentPalette, i+j, 255, currentBlending);
-    }
-    leds[i+EyeSize+1] = ColorFromPalette( currentPalette, i+EyeSize+1, 150, currentBlending);
-    //leds[i+EyeSize+1] = CRGB(hue/10, hue/10, hue/10);
-    showStrip();
-    delay(SpeedDelay);
-  }
-  delay(ReturnDelay);
-}
-
-void RightToLeft(byte blue, byte red, byte green, int EyeSize, int SpeedDelay, int ReturnDelay) {
-  for(int i = NUM_LEDS-EyeSize-2; i > 0; i--) {
-    if(hue>255){
-      hue = 0;
-    }
-    hue++;
-    SetAll(0,0,0);
-    //leds[i] = CRGB(hue/10, hue/10, hue/10);
-    leds[i] = ColorFromPalette( currentPalette, i, 150, currentBlending);
-
-    for(int j = 1; j <= EyeSize; j++) {
-      leds[i+j] = ColorFromPalette( currentPalette, i+j, 255, currentBlending);
-    }
-    leds[i+EyeSize+1] = ColorFromPalette( currentPalette, i+EyeSize+1, 150, currentBlending);
-    //leds[i+EyeSize+1] = CRGB(hue/10, hue/10, hue/10);
     showStrip();
     delay(SpeedDelay);
   }
@@ -307,103 +346,6 @@ void RGBLoop(){
     }
   }
 }
-
-void SetAll(byte red, byte green, byte blue) {
-  for(int i = 0; i < NUM_LEDS; i++ ) {
-    leds[i] = CRGB(red, green, blue);
-  }
-   FastLED.show();
-}
-
-int ReadSoundDifference() {
-  int soundValue1 = analogRead(ANALOG_READ);
-  delay(1);
-  int soundValue2 = analogRead(ANALOG_READ);
-  int diff = soundValue1 - soundValue2;
-  //Serial.println(soundValue1);
-  //Serial.println(soundValue2);
-  return diff;
-}
-
-void ChangeColourState() {
-  if(currentPalette==PartyColors_p){
-    currentPalette=RainbowColors_p;
-  }
-  else if(currentPalette==CloudColors_p){
-    currentPalette=PartyColors_p;
-  }
-  else if(currentPalette==RainbowColors_p){
-    currentPalette=CloudColors_p;
-  }
-  /*if (ledColour == red) {
-    ledColour = green;
-  }
-  else if (ledColour == green) {
-    ledColour = blue;
-  }
-  else if (ledColour == blue) {
-    ledColour = red;
-  }*/
-}
-
-void DisplaySolidColour() {
-  int sound = ReadSoundDifference();
-  //Serial.println(sound);
-  
-  for(int i=0; i<NUM_LEDS; i++){
-  if(sound > 100 || sound < -100){
-        leds[i] = CHSV(abs(sound)/2, 0, i/10);
-  }
-  else if(sound > 50 || sound < -50){
-        leds[i] = CHSV(0, i/5, abs(sound));
-  }
-  else if(sound > 30 || sound < -30){
-        leds[i] = CHSV(0, abs(sound), i);
-  }
-  else if(sound > 25 || sound < -25){
-    leds[i] = CHSV(i, 15, abs(sound));
-  }
-  else if(sound > 20 || sound < -20){
-    leds[i] = CHSV(30, i, abs(sound));
-  }
-  else if(sound > 15 || sound < -15){
-    leds[i] = CHSV(abs(sound), 10, i);
-  }
-  else if(sound > 10 || sound < -10){
-    leds[i] = CHSV(20, i, abs(sound));
-  }
-  else if(sound > 5 || sound < -5){
-        currentPalette = CloudColors_p;
-    leds[i] = ColorFromPalette( currentPalette, i, 150, currentBlending);
-  }
-  else if(sound == 0){
-    FastLED.clear();
-    FastLED.show();
-  }
-  else{
-    currentPalette = RainbowColors_p;
-    leds[i] = ColorFromPalette( currentPalette, i, 150, currentBlending);
-  }
-  }
-  /*
-  if (sound > 2 || sound < -2) {
-    for (int ledIndex = 0; ledIndex < NUM_LEDS; ledIndex++) {
-      leds[ledIndex] = ColorFromPalette( currentPalette, ledIndex, 255, currentBlending);
-      
-      if (ledColour == red) {
-        leds[ledIndex] = CRGB(255, 0, 0);
-      }
-      else if (ledColour == green) {
-        leds[ledIndex] = CRGB(0, 255, 0);
-      }
-      else if (ledColour == blue) {
-        leds[ledIndex] = CRGB(0, 0, 255);
-      }*/
-    
-    FastLED.show();
-    delay(50);
-    ChangeColourState();
-}  
 
 /**Funtion to check if the lamp should either enter a HIGH mode,
   or revert to NORMAL if already in HIGH. If the sensors report values
@@ -435,14 +377,12 @@ void check_high(int avg) {
   }
 }
 
-//Main function for visualizing the sounds in the lamp
+//Main function for visualizing the sounds
 void visualize_music() {
   int sensor_value, mapped, avg, longavg;
 
   //Actual sensor value
   sensor_value = analogRead(ANALOG_READ);
-  //Serial.println(sensor_value);
-  //If 0, discard immediately. Probably not right and save CPU.
   if (sensor_value == 0)
     return;
 
@@ -484,25 +424,6 @@ void visualize_music() {
 
   //Decides how many of the LEDs will be lit
   curshow = fscale(MIC_LOW, MIC_HIGH, 0.0, (float)NUM_LEDS, float(avg), -1);
-
-  /*if(avg == 524){
-    curshow = NUM_LEDS/2;
-    }
-    else if(avg == 525 || avg == 523){
-    curshow = NUM_LEDS/2 + 20;
-    }
-    else if(avg == 526 || avg == 522){
-    curshow = NUM_LEDS/2 + 30;
-    }
-    else if(avg == 527 || avg == 521){
-    curshow = NUM_LEDS/2 + 40;
-    }
-    else if(avg == 528 || avg == 520){
-    curshow = NUM_LEDS/2 + 50;
-    }
-    else if(avg == 529 || avg == 519){
-    curshow = NUM_LEDS;
-    }*/
 
   /*Set the different leds. Control for too high and too low values.
     Fun thing to try: Dont account for overflow in one direction,

@@ -5,13 +5,13 @@
 #include <Keypad.h>
 
 //Arduino set up
-#define NUM_LEDS 149
+#define NUM_LEDS 300
 #define LED_PIN 2
 #define ANALOG_READ 0
 
 //MIC settings
-#define MIC_LOW 400
-#define MIC_HIGH 420
+#define MIC_LOW 405
+#define MIC_HIGH 435
 
 //Arduino loop delay
 #define DELAY 1
@@ -82,6 +82,9 @@ ColourState ledColour = blue;
 
 //set default to 1 on boot
 static char ledType = '1';
+
+static int width = 1;
+static int reverse = 0;
 
 //Keypad setup
 const byte ROWS = 4;
